@@ -1,0 +1,36 @@
+# ROBOTIC ARM WITH STM32 NUCLEO F446RE 
+
+## To start this project you need hardware components :
+
+    - Stm32 nucleo F446RE 
+    - PWM servo driver shield l2C PCA9685
+    - Power supply output 6 A and 5 V or 6 V
+    - 6 DOF Robotic Mechanical ARM with servos ( this is a kit otherwise you can buy the 6 servos and the chassis of the robotic arm via supplier or 3D printed)
+    
+## Optional : 
+
+    - Breadboard with 6 buttons to control the spin of the servos 
+
+
+
+## Video of the robotic arm : 
+
+
+
+## How to configure the Hardware :
+
+
+## How to start the project Software: 
+
+First of all you need to download STM32CubeMX. Once you downloaded it, you can chose file -> new project -> board selector and in this part inside the field "Commercial Part number" you type the F446RE than you select the board and click start project.
+
+![](imgs/STM32.png)
+
+In Pinout & Configuration is very important to select Connectivity , l2C1 , on the field disable put l2C, select GPIO settings ( under the board) select PB8 and PB9 as GPIO Pull UP. Once u done that u type generate code and it will make the folder of the name of the project.
+
+Than you go to VS code , download the extension STM32cube_for_visual_studio_code is very important to accept the notification that will pop up for the debugging and is importatn that we use as debugger the ST-Link server. 
+
+Once you done all of that we can start building our code in the Core/Src/main.c
+
+
+
