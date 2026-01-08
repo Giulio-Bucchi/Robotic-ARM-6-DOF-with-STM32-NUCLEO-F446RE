@@ -50,8 +50,9 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 // Sistema di controllo con pulsanti
-uint8_t selected_servo = 0;  // Servo selezionato (0-5)
-uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90}; // Angoli dei 6 servo
+uint8_t selected_servo = 0;  // Servo selezionato (0-5 nel codice = Servo 1-6 fisicamente)
+// SERVO 3 (tuo) = SERVO 2 (codice/array index 2) - parte da 120° (braccio in basso)
+uint8_t servo_angles[6] = {90, 90, 120, 90, 90, 90}; // Angoli dei 6 servo
 
 // Direzione di rotazione per ogni servo (1 = avanti, -1 = indietro)
 int8_t servo_direction[6] = {1, 1, 1, 1, 1, 1};
@@ -99,13 +100,12 @@ static void MX_I2C1_Init(void);
 // Per servo standard: 1ms=0°, 1.5ms=90°, 2ms=180°
 // Con prescaler per 50Hz: 4096 ticks = 20ms
 // 1ms = 205 ticks, 1.5ms = 307 ticks, 2ms = 410 ticks
-uint16_t Servo_AngleToPWM(uint8_t angle) {
+uint16_t Servo_AngleToPWM(uint8_t angle, uint8_t channel) {
     // Limita l'angolo tra 0 e 180
     if (angle > 180) angle = 180;
     
+    // Tutti i servo usano lo stesso range INVERTITO
     // Range INVERTITO: da 410 (2ms) a 205 (1ms)
-    // Formula invertita: PWM = 410 - (angle * 205 / 180)
-    // Questo inverte il senso di rotazione del servo
     uint16_t pwm = 410 - ((uint32_t)angle * 205 / 180);
     
     return pwm;
@@ -168,6 +168,15 @@ HAL_StatusTypeDef PCA9685_Init(void) {
     if (status != HAL_OK) return status;
     HAL_Delay(1);
     
+    // IMPORTANTE: Spegni TUTTI i canali PWM prima di usarli
+    // Questo previene segnali spazzatura che fanno tremare i servo
+    for(int i = 0; i < 16; i++) {
+        // Imposta OFF = 4096 (sempre OFF, nessun segnale PWM)
+        uint8_t off_data[4] = {0, 0, 0, 0x10}; // 0x1000 = 4096 in little-endian
+        HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, LED0_ON_L + 4 * i, 1, off_data, 4, 100);
+    }
+    HAL_Delay(10);
+    
     // Leggi MODE1 per debug
     uint8_t mode1_read;
     status = HAL_I2C_Mem_Read(&hi2c1, PCA9685_ADDRESS, PCA9685_MODE1, 1, &mode1_read, 1, 100);
@@ -215,7 +224,7 @@ HAL_StatusTypeDef PCA9685_SetPWM(uint8_t channel, uint16_t on, uint16_t off) {
 
 // Funzione per muovere il servo a un angolo specifico
 void Servo_SetAngle(uint8_t channel, uint8_t angle) {
-    uint16_t pwm = Servo_AngleToPWM(angle);
+    uint16_t pwm = Servo_AngleToPWM(angle, channel);
     PCA9685_SetPWM(channel, 0, pwm);
 }
 
@@ -349,10 +358,16 @@ int main(void)
       while(1);
   }
   
-  // Posiziona tutti i servo a 90° (posizione home)
+  // Posiziona i servo nelle posizioni iniziali sicure
+  // TUO SERVO 3 = CODICE SERVO 2 (array index 2) - parte da 45° (braccio in basso - Foto 1)
   for(int i = 0; i < 6; i++) {
-      Servo_SetAngle(i, 90);
-      servo_angles[i] = 90;
+      if (i == 2) {  // SERVO 2 nel codice = TUO SERVO 3
+          Servo_SetAngle(i, 120);  // Parte da 120° (posizione alta)
+          servo_angles[i] = 120;
+      } else {
+          Servo_SetAngle(i, 90);  // Altri servo a 90°
+          servo_angles[i] = 90;
+      }
   }
   HAL_Delay(500);
   
@@ -411,30 +426,50 @@ int main(void)
     
     // ============= 3 PULSANTI: D2, D3, D4 =============
     
-    // D2 (PA10): Oscillazione continua avanti-indietro (0° ↔ 180°)
-    // Incrementa di 5° ogni 20ms, inverte direzione ai limiti
+    // D2 (PA10): Oscillazione continua avanti-indietro
+    // TUO SERVO 3 (codice servo 2) ha limiti speciali (45° ↔ 120°) per evitare blocchi
+    // Altri servo: range completo (0° ↔ 180°)
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == GPIO_PIN_RESET) {
         // Incrementa o decrementa in base alla direzione
         servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
         
-        // Controlla i limiti e inverte la direzione
-        if (servo_angles[selected_servo] >= 180) {
-            servo_angles[selected_servo] = 180;
-            servo_direction[selected_servo] = -1; // Inverte: ora va indietro
-        } 
-        else if (servo_angles[selected_servo] <= 0) {
-            servo_angles[selected_servo] = 0;
-            servo_direction[selected_servo] = 1;  // Inverte: ora va avanti
+        // Limiti speciali per TUO SERVO 3 (codice = 2)
+        if (selected_servo == 2) {
+            // TUO SERVO 3: limita tra 75° e 110° 
+            if (servo_angles[selected_servo] >= 110) {
+                servo_angles[selected_servo] = 110;
+                servo_direction[selected_servo] = -1; // Inverte: ora va indietro
+            } 
+            else if (servo_angles[selected_servo] <= 75) {
+                servo_angles[selected_servo] = 75;
+                servo_direction[selected_servo] = 1;  // Inverte: ora va avanti
+            }
+        }
+        // Limiti normali per altri servo
+        else {
+            if (servo_angles[selected_servo] >= 180) {
+                servo_angles[selected_servo] = 180;
+                servo_direction[selected_servo] = -1; // Inverte: ora va indietro
+            } 
+            else if (servo_angles[selected_servo] <= 0) {
+                servo_angles[selected_servo] = 0;
+                servo_direction[selected_servo] = 1;  // Inverte: ora va avanti
+            }
         }
         
         Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
         HAL_Delay(20); // Velocità fluida
     }
     
-    // D3 (PB3): Reset posizione a 90°
+    // D3 (PB3): Reset posizione (90° per tutti, 45° per TUO servo 3)
     if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
-        servo_angles[selected_servo] = 90;
-        Servo_SetAngle(selected_servo, 90);
+        if (selected_servo == 2) {  // TUO SERVO 3 = codice servo 2
+            servo_angles[selected_servo] = 120;   // Torna a 45° (posizione bassa)
+            Servo_SetAngle(selected_servo, 120);
+        } else {
+            servo_angles[selected_servo] = 90;   // Altri servo tornano a 90°
+            Servo_SetAngle(selected_servo, 90);
+        }
         
         // Aspetta rilascio pulsante per evitare reset multipli
         while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
