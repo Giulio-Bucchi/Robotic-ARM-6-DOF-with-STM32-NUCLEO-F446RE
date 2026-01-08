@@ -49,6 +49,21 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+// Sistema di controllo con pulsanti
+uint8_t selected_servo = 0;  // Servo selezionato (0-5)
+uint8_t servo_angles[6] = {90, 90, 90, 90, 90, 90}; // Angoli dei 6 servo
+
+// Direzione di rotazione per ogni servo (1 = avanti, -1 = indietro)
+int8_t servo_direction[6] = {1, 1, 1, 1, 1, 1};
+
+// Definizione angoli per i 4 pulsanti (SOLO GPIOA per test)
+// A0=0°, A1=90°, A4=180°, A5=90° (ignoriamo A2/A3 per ora)
+const uint8_t button_angles[6] = {0, 90, 90, 135, 180, 90};
+
+// Debounce separato per ogni pulsante (6 pulsanti angoli + USER button = 7)
+uint32_t last_button_time[7] = {0, 0, 0, 0, 0, 0, 0};
+#define DEBOUNCE_DELAY 250  // ms
+
 // Variabile per memorizzare l'angolo del servo
 uint8_t servo_angle = 90; // Angolo iniziale a 90°
 uint8_t servo_channel = 0; // Canale del servo (0-15)
@@ -83,14 +98,16 @@ static void MX_I2C1_Init(void);
 // Funzione per convertire angolo in valore PWM per servo
 // Per servo standard: 1ms=0°, 1.5ms=90°, 2ms=180°
 // Con prescaler per 50Hz: 4096 ticks = 20ms
-// Quindi: 1ms = 205 ticks, 2ms = 410 ticks
+// 1ms = 205 ticks, 1.5ms = 307 ticks, 2ms = 410 ticks
 uint16_t Servo_AngleToPWM(uint8_t angle) {
     // Limita l'angolo tra 0 e 180
     if (angle > 180) angle = 180;
     
-    // Calcolo: 205 ticks (1ms) per 0°, 410 ticks (2ms) per 180°
-    // Formula: PWM = 205 + (angle * 205 / 180)
-    uint16_t pwm = 205 + ((uint32_t)angle * 205 / 180);
+    // Range INVERTITO: da 410 (2ms) a 205 (1ms)
+    // Formula invertita: PWM = 410 - (angle * 205 / 180)
+    // Questo inverte il senso di rotazione del servo
+    uint16_t pwm = 410 - ((uint32_t)angle * 205 / 180);
+    
     return pwm;
 }
 
@@ -202,6 +219,32 @@ void Servo_SetAngle(uint8_t channel, uint8_t angle) {
     PCA9685_SetPWM(channel, 0, pwm);
 }
 
+// Funzione per indicare il servo selezionato con lampeggi LED
+void IndicateSelectedServo(uint8_t servo_num) {
+    // Lampeggia LED N volte (N = servo_num + 1)
+    for(int i = 0; i <= servo_num; i++) {
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+        HAL_Delay(150);
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+        HAL_Delay(150);
+    }
+    HAL_Delay(500); // Pausa finale
+}
+
+// Funzione per verificare se un pulsante è premuto (con debounce)
+// button_id: 0-5 per i pulsanti angoli, 6 per USER button
+uint8_t IsButtonPressed(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, uint8_t button_id) {
+    if (HAL_GetTick() - last_button_time[button_id] < DEBOUNCE_DELAY) {
+        return 0; // Ignora se troppo presto
+    }
+    
+    if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) == GPIO_PIN_RESET) {
+        last_button_time[button_id] = HAL_GetTick();
+        return 1;
+    }
+    return 0;
+}
+
 // Funzione per inviare messaggio via UART
 void UART_SendString(char* str) {
     HAL_UART_Transmit(&huart2, (uint8_t*)str, strlen(str), 100);
@@ -288,10 +331,13 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
-  // LED verde lampeggia 1 volta - sistema avviato
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-  HAL_Delay(500);
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  // LED verde lampeggia 3 volte VELOCE - programma avviato
+  for(int i = 0; i < 3; i++) {
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+      HAL_Delay(100);
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+      HAL_Delay(100);
+  }
   HAL_Delay(500);
 
   // Inizializza PCA9685
@@ -303,20 +349,24 @@ int main(void)
       while(1);
   }
   
-  // Posiziona servo a 90° (posizione centrale)
-  Servo_SetAngle(servo_channel, 90);
+  // Posiziona tutti i servo a 90° (posizione home)
+  for(int i = 0; i < 6; i++) {
+      Servo_SetAngle(i, 90);
+      servo_angles[i] = 90;
+  }
   HAL_Delay(500);
   
   // Messaggio di benvenuto via UART
   UART_SendString("\r\n\r\n");
   UART_SendString("================================\r\n");
-  UART_SendString("  PANNELLO CONTROLLO SERVO\r\n");
+  UART_SendString("  CONTROLLO 6 SERVO CON PULSANTI\r\n");
   UART_SendString("  STM32 + PCA9685\r\n");
   UART_SendString("================================\r\n");
-  UART_SendString("Scrivi 'help' per i comandi\r\n\r\n");
+  UART_SendString("USER: Cambia servo\r\n");
+  UART_SendString("A0-A5: Angoli (30-180)\r\n\r\n");
   
-  // Abilita ricezione UART in interrupt mode
-  HAL_UART_Receive_IT(&huart2, &rx_data, 1);
+  // Indica servo selezionato inizialmente
+  IndicateSelectedServo(selected_servo);
 
   /* USER CODE END 2 */
 
@@ -328,12 +378,78 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     
-    // Loop principale - il sistema risponde ai comandi UART
-    // Lampeggia brevemente il LED per mostrare che è attivo
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-    HAL_Delay(50);
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-    HAL_Delay(1950);
+    // ============= PULSANTE USER: Cambio Servo =============
+    if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET) {
+        // Aspetta rilascio pulsante
+        while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET) {
+            HAL_Delay(10);
+        }
+        
+        // Cambia servo selezionato (0-5)
+        selected_servo = (selected_servo + 1) % 6;
+        
+        // Indica servo selezionato con lampeggi
+        IndicateSelectedServo(selected_servo);
+        
+        HAL_Delay(300); // Debounce
+    }
+    
+    // ============= TEST DIAGNOSTICO - STAMPA STATO PIN =============
+    static uint32_t last_debug_time = 0;
+    
+    // Ogni secondo, stampa lo stato di tutti i pin (per debug con LED)
+    if (HAL_GetTick() - last_debug_time > 2000) {
+        last_debug_time = HAL_GetTick();
+        // Lampeggio veloce = sistema vivo
+        for(int i=0; i<2; i++) {
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+            HAL_Delay(50);
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+            HAL_Delay(50);
+        }
+    }
+    
+    // ============= 3 PULSANTI: D2, D3, D4 =============
+    
+    // D2 (PA10): Oscillazione continua avanti-indietro (0° ↔ 180°)
+    // Incrementa di 5° ogni 20ms, inverte direzione ai limiti
+    if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == GPIO_PIN_RESET) {
+        // Incrementa o decrementa in base alla direzione
+        servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
+        
+        // Controlla i limiti e inverte la direzione
+        if (servo_angles[selected_servo] >= 180) {
+            servo_angles[selected_servo] = 180;
+            servo_direction[selected_servo] = -1; // Inverte: ora va indietro
+        } 
+        else if (servo_angles[selected_servo] <= 0) {
+            servo_angles[selected_servo] = 0;
+            servo_direction[selected_servo] = 1;  // Inverte: ora va avanti
+        }
+        
+        Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
+        HAL_Delay(20); // Velocità fluida
+    }
+    
+    // D3 (PB3): Reset posizione a 90°
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
+        servo_angles[selected_servo] = 90;
+        Servo_SetAngle(selected_servo, 90);
+        
+        // Aspetta rilascio pulsante per evitare reset multipli
+        while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
+            HAL_Delay(10);
+        }
+        HAL_Delay(200); // Debounce
+    }
+    
+    // D4 (PB5): Non fa nulla (placeholder per future funzioni)
+    // if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == GPIO_PIN_RESET) {
+    //     // Nessuna azione
+    // }
+    
+    // Piccolo delay per non sovraccaricare
+    HAL_Delay(10);
 
   }
   /* USER CODE END 3 */
@@ -488,6 +604,21 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+  
+  // Configurazione 3 pulsanti: D2, D3, D4
+  // D2=PA10 (rotazione continua), D3=PB3 (reset), D4=PB5 (nessuna azione)
+  
+  // PA10 (D2)
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  
+  // PB3, PB5 (D3, D4)
+  GPIO_InitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
