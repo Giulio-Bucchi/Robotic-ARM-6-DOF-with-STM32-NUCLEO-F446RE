@@ -3,9 +3,13 @@
 ## To start this project you need hardware components :
 
     - Stm32 nucleo F446RE 
-    - PWM servo driver shield l2C PCA9685
+    - PWM servo driver shield I2C PCA9685
     - Power supply output 6 A and 5 V or 6 V
-    - 6 DOF Robotic Mechanical ARM with servos ( this is a kit otherwise you can buy the 6 servos and the chassis of the robotic arm via supplier or 3D printed)
+    - 6 DOF Robotic Mechanical ARM with servos :
+        - you can buy the kit from aliexpress or pusing 3d print for the chassis
+        - If you want to buy servos the one that i m using MG996R can spin only for 180 degrees
+        
+
     
 ## Optional : 
 
@@ -26,7 +30,7 @@ First of all you need to download STM32CubeMX. Once you downloaded it, you can c
 
 ![](imgs/STM32.png)
 
-In Pinout & Configuration is very important to select Connectivity , l2C1 , on the field disable put l2C, select GPIO settings ( under the board) select PB8 and PB9 as GPIO Pull UP. Once u done that u type generate code and it will make the folder of the name of the project.
+In Pinout & Configuration is very important to select Connectivity , I2C1 , on the field disable put I2C, select GPIO settings ( under the board) select PB8 and PB9 as GPIO Pull UP. Once u done that u type generate code and it will make the folder of the name of the project.
 
 Than you go to VS code , download the extension STM32cube_for_visual_studio_code is very important to accept the notification that will pop up for the debugging and is important that we use as debugger the ST-Link server. 
 
@@ -37,5 +41,5 @@ Once you done all of that we can start building our code in the Core/Src/main.c
 
 
 
-## FUTURE PROJECT USING A GLOVE TO CONTROL THE ARM USING FLEX SENSORS + 2 ESP32  ( 1 for stm32 and 1 for the gloves )
+## FUTURE PROJECT : USING A GLOVE TO CONTROL THE ARM 
 
