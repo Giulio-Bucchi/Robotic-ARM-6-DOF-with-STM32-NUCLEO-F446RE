@@ -359,10 +359,13 @@ int main(void)
   }
   
   // Posiziona i servo nelle posizioni iniziali sicure
-  // TUO SERVO 3 = CODICE SERVO 2 (array index 2) - parte da 45° (braccio in basso - Foto 1)
+  // TUO SERVO 3 = CODICE SERVO 2 (array index 2) - NON VIENE TOCCATO (resta spento)
   for(int i = 0; i < 6; i++) {
-      if (i == 2) {  // SERVO 2 nel codice = TUO SERVO 3
-          Servo_SetAngle(i, 120);  // Parte da 120° (posizione alta)
+      if (i == 2) {  // SERVO 2 nel codice = TUO SERVO 3 - NON MUOVERE
+          // Non impostare nessun angolo - resta completamente spento
+          servo_angles[i] = 110; // Solo per tenere traccia, ma non invia PWM
+      } else if (i == 3) {  // SERVO 3 (array index 3) - Inizializza a 120°
+          Servo_SetAngle(i, 120);
           servo_angles[i] = 120;
       } else {
           Servo_SetAngle(i, 90);  // Altri servo a 90°
@@ -399,13 +402,10 @@ int main(void)
         while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET) {
             HAL_Delay(10);
         }
-        
         // Cambia servo selezionato (0-5)
         selected_servo = (selected_servo + 1) % 6;
-        
         // Indica servo selezionato con lampeggi
         IndicateSelectedServo(selected_servo);
-        
         HAL_Delay(300); // Debounce
     }
     
@@ -424,65 +424,68 @@ int main(void)
         }
     }
     
-    // ============= 3 PULSANTI: D2, D3, D4 =============
-    
-    // D2 (PA10): Oscillazione continua avanti-indietro
-    // TUO SERVO 3 (codice servo 2) ha limiti speciali (45° ↔ 120°) per evitare blocchi
-    // Altri servo: range completo (0° ↔ 180°)
+    // ============= PULSANTI: Movimento servo selezionato =============
+    // Servo 3 (array index 2) è bloccato: non viene mai mosso
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == GPIO_PIN_RESET) {
-        // Incrementa o decrementa in base alla direzione
-        servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
-        
-        // Limiti speciali per TUO SERVO 3 (codice = 2)
         if (selected_servo == 2) {
-            // TUO SERVO 3: limita tra 75° e 110° 
-            if (servo_angles[selected_servo] >= 110) {
-                servo_angles[selected_servo] = 110;
-                servo_direction[selected_servo] = -1; // Inverte: ora va indietro
-            } 
-            else if (servo_angles[selected_servo] <= 75) {
-                servo_angles[selected_servo] = 75;
-                servo_direction[selected_servo] = 1;  // Inverte: ora va avanti
-            }
-        }
-        // Limiti normali per altri servo
-        else {
+            // Servo 3 bloccato: non muovere
+        } else if (selected_servo == 3) {
+            // Servo 4 (array index 3): limitato tra 120° e 180°
+            servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
             if (servo_angles[selected_servo] >= 180) {
                 servo_angles[selected_servo] = 180;
-                servo_direction[selected_servo] = -1; // Inverte: ora va indietro
-            } 
-            else if (servo_angles[selected_servo] <= 0) {
-                servo_angles[selected_servo] = 0;
-                servo_direction[selected_servo] = 1;  // Inverte: ora va avanti
+                servo_direction[selected_servo] = -1;
+            } else if (servo_angles[selected_servo] <= 120) {
+                servo_angles[selected_servo] = 120;
+                servo_direction[selected_servo] = 1;
             }
-        }
-        
-        Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
-        HAL_Delay(20); // Velocità fluida
-    }
-    
-    // D3 (PB3): Reset posizione (90° per tutti, 45° per TUO servo 3)
-    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
-        if (selected_servo == 2) {  // TUO SERVO 3 = codice servo 2
-            servo_angles[selected_servo] = 120;   // Torna a 45° (posizione bassa)
-            Servo_SetAngle(selected_servo, 120);
+            Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
+            HAL_Delay(20);
+        } else if (selected_servo == 5) {
+            // Servo 6 (array index 5): limitato tra 90° e 180°
+            servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
+            if (servo_angles[selected_servo] >= 90) {
+                servo_angles[selected_servo] = 90;
+                servo_direction[selected_servo] = -1;
+            } else if (servo_angles[selected_servo] <= 0) {
+                servo_angles[selected_servo] = 0;
+                servo_direction[selected_servo] = 1;
+            }
+            Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
+            HAL_Delay(20);
         } else {
-            servo_angles[selected_servo] = 90;   // Altri servo tornano a 90°
+            // Oscillazione avanti-indietro per altri servo (range completo 0-180°)
+            servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
+            if (servo_angles[selected_servo] >= 180) {
+                servo_angles[selected_servo] = 180;
+                servo_direction[selected_servo] = -1;
+            } else if (servo_angles[selected_servo] <= 0) {
+                servo_angles[selected_servo] = 0;
+                servo_direction[selected_servo] = 1;
+            }
+            Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
+            HAL_Delay(20);
+        }
+    }
+    // D3 (PB3): Reset posizione servo selezionato
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
+        if (selected_servo == 2) {
+            // Servo 3 bloccato: non muovere
+        } else if (selected_servo == 3){
+            servo_angles[selected_servo] = 120;
+            Servo_SetAngle(selected_servo, 120);
+        } else if (selected_servo == 5){
+            servo_angles[selected_servo] = 90;
+            Servo_SetAngle(selected_servo, 90);
+        } else{
+            servo_angles[selected_servo] = 90;
             Servo_SetAngle(selected_servo, 90);
         }
-        
-        // Aspetta rilascio pulsante per evitare reset multipli
         while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
             HAL_Delay(10);
         }
-        HAL_Delay(200); // Debounce
+        HAL_Delay(200);
     }
-    
-    // D4 (PB5): Non fa nulla (placeholder per future funzioni)
-    // if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == GPIO_PIN_RESET) {
-    //     // Nessuna azione
-    // }
-    
     // Piccolo delay per non sovraccaricare
     HAL_Delay(10);
 
