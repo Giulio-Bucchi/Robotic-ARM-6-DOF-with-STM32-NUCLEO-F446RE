@@ -1,19 +1,21 @@
 # ROBOTIC ARM WITH STM32 NUCLEO F446RE 
 
-## To start this project you need hardware components :
+## HARDWARE
+
+To start this project you need hardware components :
 
     - Stm32 nucleo F446RE 
     - PWM servo driver shield I2C PCA9685
     - Power supply output 6 A and 5 V or 6 V
     - 6 DOF Robotic Mechanical ARM with servos :
-        - you can buy the kit from aliexpress or pusing 3d print for the chassis
-        - If you want to buy servos the one that i m using MG996R can spin only for 180 degrees
+        - you can buy the kit from aliexpress or using 3d print for the chassis
+        - if you want to buy servos the one that i m using MG996R can spin only for 180 degrees
         
 
     
 ## Optional : 
 
-    - Breadboard with 6 buttons to control the spin of the servos 
+Breadboard with 6 buttons to control the spin of the servos othwerise you can control it with the code by the main.c but you ll have to write it.
 
 
 
