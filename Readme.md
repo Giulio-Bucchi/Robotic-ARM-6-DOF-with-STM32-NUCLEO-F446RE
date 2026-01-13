@@ -24,7 +24,7 @@ Breadboard with 6 buttons to control the spin of the servos othwerise you can co
 
 ## Video of robotic arm :
 
-<video src="ARM.mp4" controls width="600"></video>
+<video src="https://github.com/user-attachments/assets/63f48958-d302-423b-9053-b8e0cf829b70" controls width="600"></video>
 
 
 
