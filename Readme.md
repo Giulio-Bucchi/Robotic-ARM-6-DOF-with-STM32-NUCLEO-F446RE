@@ -74,9 +74,89 @@ In Pinout & Configuration is very important to select Connectivity , I2C1 , on t
 Once you done all of that we can start building our code in the Core/Src/main.c
 
 
+
 ### Software Features
 
-This project implements a servo control system with multiple control modes:
+This project implements a servo control system with multiple control modes and a detailed logic for safe and flexible servo management.
+
+
+#### Servo Control Logic
+
+- **Initialization**: At startup, all servos are moved to safe default positions (usually 90° or 120°) to avoid mechanical stress. Servo 3 is intentionally disabled for safety.
+    ```c
+    // In main.c
+    for(int i = 0; i < 6; i++) {
+            if (i == 2) { servo_angles[i] = 110; /* disabled */ }
+            else if (i == 3 || i == 5) { Servo_SetAngle(i, 120); servo_angles[i] = 120; }
+            else { Servo_SetAngle(i, 90); servo_angles[i] = 90; }
+    }
+    ```
+- **Button Selection**: The USER button cycles through the six servos. The currently selected servo is indicated by LED blinks (N blinks = servo number).
+    ```c
+    if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET) {
+            selected_servo = (selected_servo + 1) % 6;
+            IndicateSelectedServo(selected_servo); // LED blinks
+            HAL_Delay(300); // Debounce
+    }
+    ```
+- **Movement**: Pressing Button D2 moves the selected servo incrementally. The direction is managed by an array (`servo_direction[]`), allowing oscillation between min/max angles. Button D3 resets the selected servo to its default position.
+    ```c
+    // Move selected servo (D2 pressed)
+    servo_angles[selected_servo] += (2 * servo_direction[selected_servo]);
+    if (servo_angles[selected_servo] >= max_angle) { servo_angles[selected_servo] = max_angle; servo_direction[selected_servo] = -1; }
+    else if (servo_angles[selected_servo] <= min_angle) { servo_angles[selected_servo] = min_angle; servo_direction[selected_servo] = 1; }
+    Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
+    ```
+- **Angle Limits**: Each servo has its own allowed range (e.g., 0–180°, 120–180°, 45–120°) to prevent over-rotation and damage. These limits are enforced in the code before sending PWM signals.
+- **PWM Generation**: The function `Servo_AngleToPWM(angle, channel)` converts the desired angle to a PWM value suitable for the PCA9685. The mapping is inverted (410 ticks = 0°, 205 ticks = 180°) for standard servos.
+    ```c
+    uint16_t Servo_AngleToPWM(uint8_t angle, uint8_t channel) {
+            if (angle > 180) angle = 180;
+            return 410 - ((uint32_t)angle * 205 / 180);
+    }
+    ```
+- **I2C Communication**: All PWM commands are sent to the PCA9685 via I2C. Initialization and error handling routines blink the LED to indicate status.
+    ```c
+    HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, LED0_ON_L + 4 * channel, 1, data, 4, 100);
+    ```
+- **Debouncing**: Button presses are debounced in software to avoid false triggers and ensure smooth control.
+    ```c
+    uint8_t IsButtonPressed(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, uint8_t button_id) {
+            if (HAL_GetTick() - last_button_time[button_id] < DEBOUNCE_DELAY) return 0;
+            if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) == GPIO_PIN_RESET) {
+                    last_button_time[button_id] = HAL_GetTick();
+                    return 1;
+            }
+            return 0;
+    }
+    ```
+- **Safety**: When a button is released, the PWM signal for the servo is disabled (`PCA9685_DisablePWM()`), preventing jitter and reducing power consumption.
+    ```c
+    if (button_was_pressed && selected_servo != 2) {
+            PCA9685_DisablePWM(selected_servo);
+            button_was_pressed = 0;
+    }
+    ```
+- **UART (if enabled)**: The code supports UART commands for advanced control and debugging, allowing direct angle/channel selection and status queries.
+
+#### Main Code Structure
+
+- `main.c` contains:
+    - Initialization routines for GPIO, UART, I2C, and PCA9685
+    - Main loop for button polling and servo control
+    - Functions for angle-to-PWM conversion, servo movement, and error indication
+    - Debounce logic and LED feedback
+- `stm32f4xx_it.c` handles interrupts (if used)
+- `main.h` defines pin mappings and hardware configuration
+
+#### Example: Moving a Servo
+
+1. Select servo with USER button (LED blinks N times)
+2. Press D2 to move servo: code checks limits, updates angle, sends PWM
+3. Release D2: PWM is disabled, servo holds position
+4. Press D3 to reset servo to default angle
+
+This logic ensures safe, reliable, and user-friendly control of all six servos.
 
 #### 1. **Button Control Mode**
 - **USER Button (Blue button on STM32)**: Cycles through servos 1-6
