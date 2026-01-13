@@ -4,10 +4,10 @@
 
 To start this project you need hardware components :
 
-    - Stm32 nucleo F446RE 
-    - PWM servo driver shield I2C PCA9685
-    - Power supply output 6 A and 5 V or 6 V
-    - 6 DOF Robotic Mechanical ARM with servos :
+    - Stm32 nucleo F446RE  ( 51 euros )
+    - PWM servo driver shield I2C PCA9685 ( 10 euros )
+    - Power supply output 6 A and 5 V or 6 V ( 16 euros )
+    - 6 DOF Robotic Mechanical ARM with servos ( 38 euros ):
         - you can buy the kit from aliexpress or using 3d print for the chassis
         - if you want to buy servos the one that i m using MG996R can spin only for 180 degrees
         
@@ -139,6 +139,13 @@ Or use VS Code tasks:
 - Verify servo is connected to correct PWM channel (0-5)
 - Check servo power connections
 - Use UART commands to test individual servos
+
+
+# THOUGHTS : 
+
+The project was created to understand how the STM32 works. It was built with a budget of about 110–120 euros. It was fun to build, especially learning from mistakes like burning a servo motor and the PCA9685 board. The downside is that the chassis is not very sturdy due to the weight of the gripper and the servo motors; I wouldn’t recommend the MG996R servos, but rather much more powerful ones. Unfortunately, the weight greatly affected the construction of the arm, so I used two rubber bands to hold some parts together and a 5kg dumbbell to stabilize the platform. Overall, it was a fun experience and I hope you enjoy it!
+
+
 
 
 ## FUTURE PROJECT : USING A GLOVE TO CONTROL THE ARM 
