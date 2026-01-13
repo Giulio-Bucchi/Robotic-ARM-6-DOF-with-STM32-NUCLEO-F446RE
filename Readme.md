@@ -60,13 +60,85 @@ First of all you need to download STM32CubeMX. Once you downloaded it, you can c
 
 In Pinout & Configuration is very important to select Connectivity , I2C1 , on the field disable put I2C, select GPIO settings ( under the board) select PB8 and PB9 as GPIO Pull UP. Once u done that u type generate code and it will make the folder of the name of the project.
 
-Than you go to VS code , download the extension STM32cube_for_visual_studio_code is very important to accept the notification that will pop up for the debugging and is important that we use as debugger the ST-Link server. 
+### VS Code Setup
+
+1. Open VS Code and install the **STM32 VS Code Extension** (`stm32-vscode-extension.stm32-vscode-extension`)
+2. Accept all notifications that pop up during installation
+3. **Important**: Set **ST-Link server** as the debugger (this is required for debugging STM32 boards)
+4. The extension provides:
+   - Integrated build commands
+   - Debug configuration
+   - Flash/upload capabilities
+   - Serial monitor for UART communication
 
 Once you done all of that we can start building our code in the Core/Src/main.c
 
 
-### CODE OF SERVO / BUTTONS : 
+### Software Features
 
+This project implements a servo control system with multiple control modes:
+
+#### 1. **Button Control Mode**
+- **USER Button (Blue button on STM32)**: Cycles through servos 1-6
+- **Button D2**: Moves selected servo forward/backward (auto-oscillation while pressed)
+- **Button D3**: Resets selected servo to default position (90° or 120° depending on servo)
+- **LED Indicator**: Blinks N times to show which servo is selected (N = servo number)
+
+
+
+#### 1. **Key Functions**
+- **PCA9685 I2C Communication**: Controls up to 16 servos via PWM
+- **Servo Calibration**: Inverted PWM mapping (410 ticks = 0°, 205 ticks = 180°)
+- **Safe Initialization**: All servos start at safe positions, PWM disabled when idle
+- **Error Handling**: LED blink patterns indicate initialization errors
+
+#### Code Structure
+- `PCA9685_Init()`: Initializes PWM driver with 50Hz frequency
+- `Servo_SetAngle()`: Moves servo to specified angle
+- `Servo_AngleToPWM()`: Converts angle to PWM duty cycle
+- `PCA9685_DisablePWM()`: Turns off servo to prevent jitter
+- Button debouncing and auto-oscillation for smooth control
+
+
+## Building and Flashing
+
+### Prerequisites
+- STM32CubeMX (for project generation)
+- CMake and Ninja (build system)
+- ARM GCC toolchain (`arm-none-eabi-gcc`)
+- STM32CubeProgrammer (for flashing)
+- VS Code with STM32 extension (optional but recommended)
+
+
+Or use VS Code tasks:
+- **Build STM32**: Compiles the project
+- **Clean Build**: Removes build files
+- **Flash STM32**: Programs the board
+- **Clean and Rebuild**: Full rebuild from scratch
+
+
+## Troubleshooting
+
+### Common Issues
+
+**LED blinks 15 times fast**: PCA9685 not detected
+- Check I2C wiring (SDA/SCL)
+- Verify PCA9685 power (VCC and V+)
+- Check I2C pull-up resistors on PB8/PB9
+
+**LED blinks 5 times**: PCA9685 initialization error
+- Check I2C communication
+- Verify PCA9685 address (default 0x40)
+
+**Servos jittering**: 
+- Check power supply (5V 6A minimum)
+- Ensure common ground between STM32, PCA9685, and power supply
+- PWM is automatically disabled when idle to prevent jitter
+
+**Servo not responding**:
+- Verify servo is connected to correct PWM channel (0-5)
+- Check servo power connections
+- Use UART commands to test individual servos
 
 
 ## FUTURE PROJECT : USING A GLOVE TO CONTROL THE ARM 
