@@ -29,31 +29,27 @@ Breadboard with 3 buttons to control the spin of the servos othwerise you can co
 
 
 
+## Hardware Wiring Table
 
+| Device         | Pin/Port         | Connects To           | Description                          |
+|:--------------:|:----------------:|:---------------------:|:-------------------------------------:|
+| **STM32**      | GND              | PCA9685 GND           | Common ground                        |
+| **STM32**      | 3V3              | PCA9685 VCC           | Power for logic (use 5V if supported)|
+| **STM32**      | SDA              | PCA9685 SDA           | I2C Data                             |
+| **STM32**      | SCL              | PCA9685 SCL           | I2C Clock                            |
+| **PCA9685**    | V+ (Power)       | Power Supply 5V 6A    | Servo motors power                   |
+| **PCA9685**    | GND              | Power Supply GND      | Power ground for servos              |
+| **PCA9685**    | PWM0–PWM5        | Servo 1–6 (Signal)    | Signal wire for each servo           |
+| **Breadboard** | Button 1         | STM32 D2              | Push button 1 (to GND)               |
+| **Breadboard** | Button 2         | STM32 D3              | Push button 2 (to GND)               |
+| **Breadboard** | Button 3         | STM32 D4              | Push button 3 (to GND)               |
+| **Breadboard** | GND rail         | STM32 GND             | All buttons connected to ground      |
 
-## How to configure the Hardware :
-
-
-### Hardware Connections Table
-
-| Component   | Pin/Port         | Connects to           | Note                                 |
-|-------------|------------------|-----------------------|--------------------------------------|
-| STM32       | GND              | PCA9685 GND           | Ground                               |
-| STM32       | 3V3              | PCA9685 VCC           | Power (can usare anche 5V se shield supporta) |
-| STM32       | SDA              | PCA9685 SDA           | I2C Data                             |
-| STM32       | SCL              | PCA9685 SCL           | I2C Clock                            |
-| PCA9685     | V+ (Power)       | Alimentatore 5V 6A    | Alimentazione servomotori            |
-| PCA9685     | GND              | Alimentatore GND      | Ground alimentazione                 |
-| PCA9685     | PWM0-PWM5        | Servo 1-6 (Signal)    | Collegare il segnale di ciascun servo|
-| Breadboard  | BTN1             | STM32 D2              | Pulsante 1 (connesso a GND)          |
-| Breadboard  | BTN2             | STM32 D3              | Pulsante 2 (connesso a GND)          |
-| Breadboard  | BTN3             | STM32 D4              | Pulsante 3 (connesso a GND)          |
-| Breadboard  | GND rail         | STM32 GND             | Tutti i pulsanti collegati a GND     |
-
-**Schema di collegamento:**
-- I pulsanti vanno collegati tra il pin digitale (D2, D3, D4) e GND.
-- I servomotori si collegano ai pin PWM della PCA9685, alimentati dal connettore 5V 6A.
-- La comunicazione tra STM32 e PCA9685 avviene tramite I2C (SDA/SCL).
+---
+**Wiring Notes:**
+- Each button is connected between the STM32 digital pin (D2, D3, D4) and GND.
+- Servo motors are powered by the PCA9685, which is supplied by a 5V 6A power source.
+- Communication between STM32 and PCA9685 uses I2C (SDA/SCL).
 
 
 ## How to start the project Software: 
