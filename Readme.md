@@ -15,7 +15,7 @@ To start this project you need hardware components :
     
 ## Optional : 
 
-Breadboard with 6 buttons to control the spin of the servos othwerise you can control it with the code by the main.c but you ll have to write it.
+Breadboard with 3 buttons to control the spin of the servos othwerise you can control it with the code by the main.c but you ll have to write it.
 
 
 
@@ -32,6 +32,28 @@ Breadboard with 6 buttons to control the spin of the servos othwerise you can co
 
 
 ## How to configure the Hardware :
+
+
+### Hardware Connections Table
+
+| Component   | Pin/Port         | Connects to           | Note                                 |
+|-------------|------------------|-----------------------|--------------------------------------|
+| STM32       | GND              | PCA9685 GND           | Ground                               |
+| STM32       | 3V3              | PCA9685 VCC           | Power (can usare anche 5V se shield supporta) |
+| STM32       | SDA              | PCA9685 SDA           | I2C Data                             |
+| STM32       | SCL              | PCA9685 SCL           | I2C Clock                            |
+| PCA9685     | V+ (Power)       | Alimentatore 5V 6A    | Alimentazione servomotori            |
+| PCA9685     | GND              | Alimentatore GND      | Ground alimentazione                 |
+| PCA9685     | PWM0-PWM5        | Servo 1-6 (Signal)    | Collegare il segnale di ciascun servo|
+| Breadboard  | BTN1             | STM32 D2              | Pulsante 1 (connesso a GND)          |
+| Breadboard  | BTN2             | STM32 D3              | Pulsante 2 (connesso a GND)          |
+| Breadboard  | BTN3             | STM32 D4              | Pulsante 3 (connesso a GND)          |
+| Breadboard  | GND rail         | STM32 GND             | Tutti i pulsanti collegati a GND     |
+
+**Schema di collegamento:**
+- I pulsanti vanno collegati tra il pin digitale (D2, D3, D4) e GND.
+- I servomotori si collegano ai pin PWM della PCA9685, alimentati dal connettore 5V 6A.
+- La comunicazione tra STM32 e PCA9685 avviene tramite I2C (SDA/SCL).
 
 
 ## How to start the project Software: 
