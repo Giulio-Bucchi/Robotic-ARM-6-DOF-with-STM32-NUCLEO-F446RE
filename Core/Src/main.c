@@ -52,10 +52,11 @@ UART_HandleTypeDef huart2;
 // Sistema di controllo con pulsanti
 uint8_t selected_servo = 0;  // Servo selezionato (0-5 nel codice = Servo 1-6 fisicamente)
 // SERVO 3 (tuo) = SERVO 2 (codice/array index 2) - parte da 120° (braccio in basso)
-uint8_t servo_angles[6] = {90, 90, 120, 90, 90, 90}; // Angoli dei 6 servo
+uint8_t servo_angles[6] = {90, 90, 120, 90, 90, 120}; // Angoli dei 6 servo
 
 // Direzione di rotazione per ogni servo (1 = avanti, -1 = indietro)
-int8_t servo_direction[6] = {1, 1, 1, 1, 1, 1};
+// Servo 5 parte da 120° e va verso il basso (direzione -1)
+int8_t servo_direction[6] = {1, 1, 1, 1, 1, -1};
 
 // Definizione angoli per i 4 pulsanti (SOLO GPIOA per test)
 // A0=0°, A1=90°, A4=180°, A5=90° (ignoriamo A2/A3 per ora)
@@ -222,6 +223,13 @@ HAL_StatusTypeDef PCA9685_SetPWM(uint8_t channel, uint16_t on, uint16_t off) {
     return HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, LED0_ON_L + 4 * channel, 1, data, 4, 100);
 }
 
+// Funzione per spegnere completamente il PWM di un canale
+void PCA9685_DisablePWM(uint8_t channel) {
+    // Imposta OFF = 4096 (bit 12) per spegnere completamente l'uscita
+    uint8_t data[4] = {0, 0, 0, 0x10}; // 0x1000 = 4096 in little-endian
+    HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, LED0_ON_L + 4 * channel, 1, data, 4, 100);
+}
+
 // Funzione per muovere il servo a un angolo specifico
 void Servo_SetAngle(uint8_t channel, uint8_t angle) {
     uint16_t pwm = Servo_AngleToPWM(angle, channel);
@@ -367,6 +375,9 @@ int main(void)
       } else if (i == 3) {  // SERVO 3 (array index 3) - Inizializza a 120°
           Servo_SetAngle(i, 120);
           servo_angles[i] = 120;
+      } else if (i == 5) {  // SERVO 5 (array index 5) - Inizializza a 120°
+          Servo_SetAngle(i, 120);
+          servo_angles[i] = 120;
       } else {
           Servo_SetAngle(i, 90);  // Altri servo a 90°
           servo_angles[i] = 90;
@@ -426,12 +437,16 @@ int main(void)
     
     // ============= PULSANTI: Movimento servo selezionato =============
     // Servo 3 (array index 2) è bloccato: non viene mai mosso
+    static uint8_t button_was_pressed = 0;  // Variabile per tracciare lo stato del pulsante
+    
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == GPIO_PIN_RESET) {
+        button_was_pressed = 1;  // Pulsante premuto
+        
         if (selected_servo == 2) {
             // Servo 3 bloccato: non muovere
         } else if (selected_servo == 3) {
             // Servo 4 (array index 3): limitato tra 120° e 180°
-            servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
+            servo_angles[selected_servo] += (2 * servo_direction[selected_servo]);
             if (servo_angles[selected_servo] >= 180) {
                 servo_angles[selected_servo] = 180;
                 servo_direction[selected_servo] = -1;
@@ -440,22 +455,22 @@ int main(void)
                 servo_direction[selected_servo] = 1;
             }
             Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
-            HAL_Delay(20);
+            HAL_Delay(10);
         } else if (selected_servo == 5) {
-            // Servo 6 (array index 5): limitato tra 90° e 180°
-            servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
-            if (servo_angles[selected_servo] >= 90) {
-                servo_angles[selected_servo] = 90;
+            // Servo 6 (array index 5): limitato tra 60° e 120°
+            servo_angles[selected_servo] += (2 * servo_direction[selected_servo]);
+            if (servo_angles[selected_servo] >= 120) {
+                servo_angles[selected_servo] = 120;
                 servo_direction[selected_servo] = -1;
-            } else if (servo_angles[selected_servo] <= 0) {
-                servo_angles[selected_servo] = 0;
+            } else if (servo_angles[selected_servo] <= 45) {
+                servo_angles[selected_servo] = 45;
                 servo_direction[selected_servo] = 1;
             }
             Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
-            HAL_Delay(20);
+            HAL_Delay(10);
         } else {
             // Oscillazione avanti-indietro per altri servo (range completo 0-180°)
-            servo_angles[selected_servo] += (5 * servo_direction[selected_servo]);
+            servo_angles[selected_servo] += (2 * servo_direction[selected_servo]);
             if (servo_angles[selected_servo] >= 180) {
                 servo_angles[selected_servo] = 180;
                 servo_direction[selected_servo] = -1;
@@ -464,7 +479,13 @@ int main(void)
                 servo_direction[selected_servo] = 1;
             }
             Servo_SetAngle(selected_servo, servo_angles[selected_servo]);
-            HAL_Delay(20);
+            HAL_Delay(10);
+        }
+    } else {
+        // Pulsante rilasciato - spegni PWM del servo selezionato
+        if (button_was_pressed && selected_servo != 2) {
+            PCA9685_DisablePWM(selected_servo);
+            button_was_pressed = 0;
         }
     }
     // D3 (PB3): Reset posizione servo selezionato
@@ -474,12 +495,18 @@ int main(void)
         } else if (selected_servo == 3){
             servo_angles[selected_servo] = 120;
             Servo_SetAngle(selected_servo, 120);
+            HAL_Delay(500);  // Aspetta che raggiunga la posizione
+            PCA9685_DisablePWM(selected_servo);  // Poi spegni PWM
         } else if (selected_servo == 5){
-            servo_angles[selected_servo] = 90;
-            Servo_SetAngle(selected_servo, 90);
+            servo_angles[selected_servo] = 120;
+            Servo_SetAngle(selected_servo, 120);
+            HAL_Delay(500);  // Aspetta che raggiunga la posizione
+            PCA9685_DisablePWM(selected_servo);  // Poi spegni PWM
         } else{
             servo_angles[selected_servo] = 90;
             Servo_SetAngle(selected_servo, 90);
+            HAL_Delay(500);  // Aspetta che raggiunga la posizione
+            PCA9685_DisablePWM(selected_servo);  // Poi spegni PWM
         }
         while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET) {
             HAL_Delay(10);
