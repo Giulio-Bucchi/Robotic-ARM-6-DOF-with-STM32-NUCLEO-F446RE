@@ -50,8 +50,8 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 // Sistema di controllo con pulsanti
-uint8_t selected_servo = 0;  // Servo selezionato (0-5 nel codice = Servo 1-6 fisicamente)
-// SERVO 3 (tuo) = SERVO 2 (codice/array index 2) - parte da 120° (braccio in basso)
+uint8_t selected_servo = 0;  // Servo selezionato
+// SERVO 3  = SERVO 2 (codice/array index 2) 
 uint8_t servo_angles[6] = {90, 90, 120, 90, 90, 120}; // Angoli dei 6 servo
 
 // Direzione di rotazione per ogni servo (1 = avanti, -1 = indietro)
@@ -99,8 +99,6 @@ static void MX_I2C1_Init(void);
 
 // Funzione per convertire angolo in valore PWM per servo
 // Per servo standard: 1ms=0°, 1.5ms=90°, 2ms=180°
-// Con prescaler per 50Hz: 4096 ticks = 20ms
-// 1ms = 205 ticks, 1.5ms = 307 ticks, 2ms = 410 ticks
 uint16_t Servo_AngleToPWM(uint8_t angle, uint8_t channel) {
     // Limita l'angolo tra 0 e 180
     if (angle > 180) angle = 180;
@@ -130,7 +128,7 @@ HAL_StatusTypeDef PCA9685_Init(void) {
         return status;
     }
     
-    // Reset completo via I2C (indirizzo speciale - software reset)
+    // Reset completo via I2C
     data = 0x06;
     HAL_I2C_Master_Transmit(&hi2c1, 0x00, &data, 1, 100);
     HAL_Delay(10);
@@ -150,7 +148,7 @@ HAL_StatusTypeDef PCA9685_Init(void) {
     }
     HAL_Delay(10);
     
-    // Imposta frequenza a ~50Hz (per servo)
+    // Imposta frequenza a 50Hz (per servo)
     // Prescaler = round(25MHz / (4096 * 50Hz)) - 1 = 121
     data = 121; // Prescaler per ~50Hz (standard per servo)
     status = HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, PCA9685_PRESCALE, 1, &data, 1, 100);
@@ -163,13 +161,12 @@ HAL_StatusTypeDef PCA9685_Init(void) {
     if (status != HAL_OK) return status;
     HAL_Delay(1);
     
-    // Abilita auto-increment per scritture multiple più veloci
     data = 0x20; // Bit 5 = AI (Auto-Increment)
     status = HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, PCA9685_MODE1, 1, &data, 1, 100);
     if (status != HAL_OK) return status;
     HAL_Delay(1);
     
-    // IMPORTANTE: Spegni TUTTI i canali PWM prima di usarli
+    // IMPORTANTE: Spegnere TUTTI i canali PWM prima di usarli
     // Questo previene segnali spazzatura che fanno tremare i servo
     for(int i = 0; i < 16; i++) {
         // Imposta OFF = 4096 (sempre OFF, nessun segnale PWM)
@@ -226,7 +223,7 @@ HAL_StatusTypeDef PCA9685_SetPWM(uint8_t channel, uint16_t on, uint16_t off) {
 // Funzione per spegnere completamente il PWM di un canale
 void PCA9685_DisablePWM(uint8_t channel) {
     // Imposta OFF = 4096 (bit 12) per spegnere completamente l'uscita
-    uint8_t data[4] = {0, 0, 0, 0x10}; // 0x1000 = 4096 in little-endian
+    uint8_t data[4] = {0, 0, 0, 0x10}; // 0x1000 = 4096 
     HAL_I2C_Mem_Write(&hi2c1, PCA9685_ADDRESS, LED0_ON_L + 4 * channel, 1, data, 4, 100);
 }
 
@@ -245,7 +242,7 @@ void IndicateSelectedServo(uint8_t servo_num) {
         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
         HAL_Delay(150);
     }
-    HAL_Delay(500); // Pausa finale
+    HAL_Delay(500);
 }
 
 // Funzione per verificare se un pulsante è premuto (con debounce)
@@ -271,7 +268,7 @@ void UART_SendString(char* str) {
 void ProcessCommand(char* cmd) {
     char response[100];
     
-    // Comando: "angle XXX" - imposta angolo del servo (0-180)
+    // Comando: imposta angolo del servo (0-180)
     if (strncmp(cmd, "angle ", 6) == 0) {
         int angle = atoi(cmd + 6);
         if (angle >= 0 && angle <= 180) {
@@ -283,7 +280,7 @@ void ProcessCommand(char* cmd) {
             UART_SendString("ERROR: Angolo deve essere 0-180\r\n");
         }
     }
-    // Comando: "channel X" - seleziona canale servo (0-15)
+    // Comando: - seleziona canale servo (0-15)
     else if (strncmp(cmd, "channel ", 8) == 0) {
         int ch = atoi(cmd + 8);
         if (ch >= 0 && ch <= 15) {
@@ -294,12 +291,12 @@ void ProcessCommand(char* cmd) {
             UART_SendString("ERROR: Canale deve essere 0-15\r\n");
         }
     }
-    // Comando: "status" - mostra stato corrente
+    // Comando:  - mostra stato corrente
     else if (strcmp(cmd, "status") == 0) {
         sprintf(response, "Canale: %d, Angolo: %d°\r\n", servo_channel, servo_angle);
         UART_SendString(response);
     }
-    // Comando: "help" - mostra comandi disponibili
+    // Comando: - mostra comandi disponibili
     else if (strcmp(cmd, "help") == 0) {
         UART_SendString("\r\n=== COMANDI DISPONIBILI ===\r\n");
         UART_SendString("angle XXX    - Imposta angolo (0-180)\r\n");
@@ -367,15 +364,13 @@ int main(void)
   }
   
   // Posiziona i servo nelle posizioni iniziali sicure
-  // TUO SERVO 3 = CODICE SERVO 2 (array index 2) - NON VIENE TOCCATO (resta spento)
   for(int i = 0; i < 6; i++) {
-      if (i == 2) {  // SERVO 2 nel codice = TUO SERVO 3 - NON MUOVERE
-          // Non impostare nessun angolo - resta completamente spento
+      if (i == 2) { 
           servo_angles[i] = 110; // Solo per tenere traccia, ma non invia PWM
-      } else if (i == 3) {  // SERVO 3 (array index 3) - Inizializza a 120°
+      } else if (i == 3) {  // SERVO 3 Inizializza a 120°
           Servo_SetAngle(i, 120);
           servo_angles[i] = 120;
-      } else if (i == 5) {  // SERVO 5 (array index 5) - Inizializza a 120°
+      } else if (i == 5) {  // SERVO 5 - Inizializza a 120°
           Servo_SetAngle(i, 120);
           servo_angles[i] = 120;
       } else {
@@ -394,7 +389,6 @@ int main(void)
   UART_SendString("USER: Cambia servo\r\n");
   UART_SendString("A0-A5: Angoli (30-180)\r\n\r\n");
   
-  // Indica servo selezionato inizialmente
   IndicateSelectedServo(selected_servo);
 
   /* USER CODE END 2 */
@@ -437,7 +431,7 @@ int main(void)
     
     // ============= PULSANTI: Movimento servo selezionato =============
     // Servo 3 (array index 2) è bloccato: non viene mai mosso
-    static uint8_t button_was_pressed = 0;  // Variabile per tracciare lo stato del pulsante
+    static uint8_t button_was_pressed = 0; 
     
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10) == GPIO_PIN_RESET) {
         button_was_pressed = 1;  // Pulsante premuto
@@ -763,3 +757,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
